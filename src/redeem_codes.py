@@ -19,6 +19,7 @@ DEFAULT_TIMEOUT = 20
 DEFAULT_REDEEM_DELAY_SECONDS = 5.0
 HOYOLAB_SEARCH_URL = "https://bbs-api-os.hoyolab.com/community/search/wapi/search"
 HOYOLAB_GAME_RECORD_CARD_URL = "https://bbs-api-os.hoyolab.com/game_record/card/wapi/getGameRecordCard"
+LOGIN_REQUIRED_RETCODES = {-1071}
 CODE_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9]{8,20}(?![A-Za-z0-9])")
 URL_RE = re.compile(r"https?://[^\s<>\"]+")
 LABELED_CODE_RE = re.compile(
@@ -168,14 +169,33 @@ def extract_codes_from_hoyolab_post(post: dict[str, Any]) -> list[str]:
     return merge_codes(candidates)
 
 
+def int_env(name: str, default: int, minimum: int, maximum: int) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        print(f"{name}: invalid integer value {raw!r}; using {default}.")
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+def float_env(name: str, default: float, minimum: float) -> float:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        print(f"{name}: invalid number value {raw!r}; using {default}.")
+        value = default
+    return max(minimum, value)
+
+
 def fetch_codes_from_hoyolab(cfg: GameConfig) -> list[str]:
     if os.getenv("REDEEM_HOYOLAB_ENABLED", "true").strip().lower() in {"0", "false", "no"}:
         return []
 
-    lookback_hours = int(os.getenv("HOYOLAB_LOOKBACK_HOURS", "168"))
-    lookback_hours = max(1, min(168, lookback_hours))
+    lookback_hours = int_env("HOYOLAB_LOOKBACK_HOURS", 168, 1, 168)
     oldest_ts = int((datetime.now(timezone.utc) - timedelta(hours=lookback_hours)).timestamp())
-    page_size = max(1, min(50, int(os.getenv("HOYOLAB_PAGE_SIZE", "20"))))
+    page_size = int_env("HOYOLAB_PAGE_SIZE", 20, 1, 50)
 
     seen_post_ids: set[str] = set()
     codes: list[str] = []
@@ -187,17 +207,27 @@ def fetch_codes_from_hoyolab(cfg: GameConfig) -> list[str]:
             "page_size": str(page_size),
             "order_type": "2",
         }
-        response = requests.get(
-            HOYOLAB_SEARCH_URL,
-            params=params,
-            headers={"User-Agent": "Mozilla/5.0", "x-rpc-language": "en-us"},
-            timeout=DEFAULT_TIMEOUT,
-        )
+        try:
+            response = requests.get(
+                HOYOLAB_SEARCH_URL,
+                params=params,
+                headers={"User-Agent": "Mozilla/5.0", "x-rpc-language": "en-us"},
+                timeout=DEFAULT_TIMEOUT,
+            )
+        except requests.RequestException as e:
+            print(f"{cfg.name}: HoYoLAB search failed: {e}")
+            continue
         if response.status_code >= 400:
             print(f"{cfg.name}: HoYoLAB search failed: HTTP {response.status_code} {response.text[:160]}")
             continue
 
-        payload = response.json()
+        try:
+            payload = response.json()
+        except ValueError:
+            print(f"{cfg.name}: HoYoLAB search failed: non-JSON response {response.text[:160]}")
+            continue
+        if not isinstance(payload, dict):
+            continue
         posts = ((payload.get("data") or {}).get("posts")) or []
         if not isinstance(posts, list):
             continue
@@ -257,21 +287,31 @@ def fetch_game_roles() -> list[dict[str, Any]]:
     if not ltuid:
         return []
 
-    response = requests.get(
-        HOYOLAB_GAME_RECORD_CARD_URL,
-        params={"uid": ltuid},
-        headers={
-            "Cookie": hoyolab_cookie_header(),
-            "User-Agent": "Mozilla/5.0",
-            "x-rpc-language": "en-us",
-        },
-        timeout=DEFAULT_TIMEOUT,
-    )
+    try:
+        response = requests.get(
+            HOYOLAB_GAME_RECORD_CARD_URL,
+            params={"uid": ltuid},
+            headers={
+                "Cookie": hoyolab_cookie_header(),
+                "User-Agent": "Mozilla/5.0",
+                "x-rpc-language": "en-us",
+            },
+            timeout=DEFAULT_TIMEOUT,
+        )
+    except requests.RequestException as e:
+        print(f"HoYoLAB game role lookup failed: {e}")
+        return []
     if response.status_code >= 400:
         print(f"HoYoLAB game role lookup failed: HTTP {response.status_code} {response.text[:160]}")
         return []
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except ValueError:
+        print(f"HoYoLAB game role lookup failed: non-JSON response {response.text[:160]}")
+        return []
+    if not isinstance(payload, dict):
+        return []
     if payload.get("retcode") != 0:
         print(f"HoYoLAB game role lookup failed: retcode={payload.get('retcode')} message={payload.get('message')}")
         return []
@@ -324,6 +364,45 @@ def load_profiles() -> list[RedeemProfile]:
     return load_profiles_from_env()
 
 
+def has_explicit_uid_region() -> bool:
+    for cfg in SUPPORTED_GAMES.values():
+        uid = os.getenv(f"{cfg.env_prefix}_UID", "").strip()
+        region = os.getenv(f"{cfg.env_prefix}_REGION", "").strip()
+        if uid and region:
+            return True
+    return False
+
+
+def validate_environment() -> bool:
+    missing_hoyolab_cookie = [k for k in ["LTUID", "LTOKEN", "COOKIE_TOKEN_V2"] if not os.getenv(k, "").strip()]
+    has_hoyoverse_cookie = bool(os.getenv("HOYOVERSE_COOKIE", "").strip())
+
+    if missing_hoyolab_cookie and not has_explicit_uid_region():
+        print(f"Missing HoYoLAB secrets for UID/region lookup: {', '.join(missing_hoyolab_cookie)}")
+        return False
+
+    if missing_hoyolab_cookie and not has_hoyoverse_cookie:
+        print(f"Missing redeem secrets: HOYOVERSE_COOKIE or {', '.join(missing_hoyolab_cookie)}")
+        return False
+
+    return True
+
+
+def is_already_used_message(message: str) -> bool:
+    lowered = message.lower()
+    return (
+        "already" in lowered
+        or "使用済" in message
+        or "交換済" in message
+        or ("既に" in message and ("使用" in message or "交換" in message))
+    )
+
+
+def is_login_required(retcode: Any, message: str) -> bool:
+    lowered = message.lower()
+    return retcode in LOGIN_REQUIRED_RETCODES or "login" in lowered or "ログイン" in message
+
+
 def redeem_code(profile: RedeemProfile, code: str) -> dict[str, Any]:
     params = {
         "uid": profile.uid,
@@ -341,7 +420,16 @@ def redeem_code(profile: RedeemProfile, code: str) -> dict[str, Any]:
         "Accept": "application/json, text/plain, */*",
     }
 
-    response = requests.get(profile.endpoint, params=params, headers=headers, timeout=DEFAULT_TIMEOUT)
+    try:
+        response = requests.get(profile.endpoint, params=params, headers=headers, timeout=DEFAULT_TIMEOUT)
+    except requests.RequestException as e:
+        return {
+            "ok": False,
+            "fatal": True,
+            "http": None,
+            "retcode": None,
+            "message": str(e),
+        }
     try:
         payload = response.json()
     except ValueError:
@@ -357,8 +445,8 @@ def redeem_code(profile: RedeemProfile, code: str) -> dict[str, Any]:
     message = str(payload.get("message", ""))
     # HoYoverse APIs usually return 0 for success and negative values for already used/expired/invalid.
     # Treat "already used" as non-fatal so scheduled workflows do not fail on repeated public codes.
-    ok = retcode == 0 or "already" in message.lower() or "使用済" in message or "交換済" in message
-    fatal = response.status_code >= 500 or retcode in {-100, -101, -10001}
+    ok = retcode == 0 or is_already_used_message(message)
+    fatal = response.status_code >= 500 or retcode in {-100, -101, -10001} or is_login_required(retcode, message)
     return {
         "ok": bool(ok),
         "fatal": bool(fatal),
@@ -369,21 +457,19 @@ def redeem_code(profile: RedeemProfile, code: str) -> dict[str, Any]:
 
 
 def main() -> int:
-    profiles = load_profiles()
+    load_env()
+    if not validate_environment():
+        return 1
+
+    profiles = load_profiles_from_env()
     if not profiles:
         print("No redeem codes found from HoYoLAB posts.")
         return 0
 
-    has_redeem_cookie = bool(os.getenv("HOYOVERSE_COOKIE", "").strip())
-    missing_cookie = [k for k in ["LTUID", "LTOKEN", "COOKIE_TOKEN_V2"] if not os.getenv(k, "").strip()]
-    if missing_cookie and not has_redeem_cookie:
-        print(f"Missing redeem secrets: HOYOVERSE_COOKIE or {', '.join(missing_cookie)}")
-        return 1
-
     failed = False
     for profile in profiles:
         print(f"\n== {profile.name} code redeem ==")
-        delay_seconds = max(0.0, float(os.getenv("REDEEM_DELAY_SECONDS", str(DEFAULT_REDEEM_DELAY_SECONDS))))
+        delay_seconds = float_env("REDEEM_DELAY_SECONDS", DEFAULT_REDEEM_DELAY_SECONDS, 0.0)
         for index, code in enumerate(profile.codes):
             if index > 0 and delay_seconds:
                 time.sleep(delay_seconds)

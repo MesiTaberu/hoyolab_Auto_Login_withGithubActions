@@ -1,6 +1,5 @@
 import argparse
 import json
-import sys
 from pathlib import Path
 
 
@@ -20,12 +19,6 @@ def pause_exit(enabled: bool) -> None:
     except (EOFError, KeyboardInterrupt):
         pass
 
-
-def exe_dir() -> Path:
-    try:
-        return Path(sys.executable).resolve().parent
-    except Exception:
-        return Path.cwd()
 
 def _iter_har_request_headers(har: dict) -> list[dict[str, str]]:
     # Return list of {header_name_lower: value} for each request in HAR.

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import os
-import sys
-from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 from browser_cookies_windows import find_default_profile, read_hoyolab_tokens_from_profile, taskkill_browser
 
@@ -25,29 +22,6 @@ def pause_exit(enabled: bool) -> None:
         pass
 
 
-def default_user_data_dirs() -> Tuple[Path, Path]:
-    lad = Path(os.environ.get("LOCALAPPDATA", ""))
-    chrome = lad / "Google" / "Chrome" / "User Data"
-    edge = lad / "Microsoft" / "Edge" / "User Data"
-    return chrome, edge
-
-
-def pick_profile_dir(user_data_dir: Path, preferred: Optional[str]) -> Optional[str]:
-    if not user_data_dir.exists():
-        return None
-
-    if preferred:
-        return preferred
-
-    if (user_data_dir / "Default").exists():
-        return "Default"
-
-    for p in sorted(user_data_dir.glob("Profile *")):
-        if p.is_dir():
-            return p.name
-    return None
-
-
 def _load_hoyolab_tokens_from_default_profile(browser: str, profile_directory: Optional[str], kill_browser: bool) -> Dict[str, str]:
     prof = find_default_profile(browser, profile_directory)
     print(f"browser: {prof.name}")
@@ -57,22 +31,6 @@ def _load_hoyolab_tokens_from_default_profile(browser: str, profile_directory: O
         print(f"taskkill: closing {prof.name} to avoid cookie DB lock...")
         taskkill_browser(prof.name)
     return read_hoyolab_tokens_from_profile(prof)
-
-
-def extract_hoyolab_cookie_values(cookies: list[dict]) -> Dict[str, str]:
-    cookie_dict: Dict[str, str] = {}
-    for c in cookies:
-        domain = str(c.get("domain", ""))
-        if "hoyolab.com" in domain:
-            name = str(c.get("name", ""))
-            value = str(c.get("value", ""))
-            cookie_dict[name] = value
-
-    return {
-        "LTUID": cookie_dict.get("ltuid_v2", ""),
-        "LTOKEN": cookie_dict.get("ltoken_v2", ""),
-        "COOKIE_TOKEN_V2": cookie_dict.get("cookie_token_v2", ""),
-    }
 
 
 def run_cookie_grab(
