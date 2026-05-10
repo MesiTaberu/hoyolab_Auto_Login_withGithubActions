@@ -106,6 +106,7 @@ cookiegrab.exe 5 "C:\\path\\to\\endfield.har" --raw
 | `LTUID` | HoYoLAB / HoYoverse Cookie |
 | `LTOKEN` | HoYoLAB / HoYoverse Cookie |
 | `COOKIE_TOKEN_V2` | HoYoLAB / HoYoverse Cookie |
+| `HOYOVERSE_COOKIE` | 交換ページのCookieヘッダー。登録されている場合、交換APIではこちらを優先 |
 
 UID / region は Cookie から自動取得します。複数アカウントなどで明示したい場合だけ Variables を登録してください。
 

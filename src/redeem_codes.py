@@ -231,7 +231,7 @@ def fetch_codes_from_hoyolab(cfg: GameConfig) -> list[str]:
     return found
 
 
-def cookie_header() -> str:
+def hoyolab_cookie_header() -> str:
     ltuid = os.getenv("LTUID", "").strip()
     ltoken = os.getenv("LTOKEN", "").strip()
     cookie_token = os.getenv("COOKIE_TOKEN_V2", "").strip()
@@ -243,6 +243,13 @@ def cookie_header() -> str:
     )
 
 
+def redeem_cookie_header() -> str:
+    hoyoverse_cookie = os.getenv("HOYOVERSE_COOKIE", "").strip()
+    if hoyoverse_cookie:
+        return hoyoverse_cookie
+    return hoyolab_cookie_header()
+
+
 def fetch_game_roles() -> list[dict[str, Any]]:
     ltuid = os.getenv("LTUID", "").strip()
     if not ltuid:
@@ -252,7 +259,7 @@ def fetch_game_roles() -> list[dict[str, Any]]:
         HOYOLAB_GAME_RECORD_CARD_URL,
         params={"uid": ltuid},
         headers={
-            "Cookie": cookie_header(),
+            "Cookie": hoyolab_cookie_header(),
             "User-Agent": "Mozilla/5.0",
             "x-rpc-language": "en-us",
         },
@@ -325,7 +332,7 @@ def redeem_code(profile: RedeemProfile, code: str) -> dict[str, Any]:
         "sLangKey": profile.lang,
     }
     headers = {
-        "Cookie": cookie_header(),
+        "Cookie": redeem_cookie_header(),
         "User-Agent": "Mozilla/5.0",
         "Referer": "https://www.hoyoverse.com/",
         "Origin": "https://www.hoyoverse.com",
@@ -365,9 +372,10 @@ def main() -> int:
         print("No redeem codes found from HoYoLAB posts.")
         return 0
 
+    has_redeem_cookie = bool(os.getenv("HOYOVERSE_COOKIE", "").strip())
     missing_cookie = [k for k in ["LTUID", "LTOKEN", "COOKIE_TOKEN_V2"] if not os.getenv(k, "").strip()]
-    if missing_cookie:
-        print(f"Missing HoYoLAB secrets: {', '.join(missing_cookie)}")
+    if missing_cookie and not has_redeem_cookie:
+        print(f"Missing redeem secrets: HOYOVERSE_COOKIE or {', '.join(missing_cookie)}")
         return 1
 
     failed = False

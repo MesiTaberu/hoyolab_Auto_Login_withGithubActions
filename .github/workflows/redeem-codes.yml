@@ -12,6 +12,7 @@ jobs:
       LTUID: ${{ secrets.LTUID }}
       LTOKEN: ${{ secrets.LTOKEN }}
       COOKIE_TOKEN_V2: ${{ secrets.COOKIE_TOKEN_V2 }}
+      HOYOVERSE_COOKIE: ${{ secrets.HOYOVERSE_COOKIE }}
 
       GENSHIN_UID: ${{ vars.GENSHIN_UID }}
       GENSHIN_REGION: ${{ vars.GENSHIN_REGION }}
