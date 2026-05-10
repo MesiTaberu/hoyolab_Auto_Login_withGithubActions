@@ -107,15 +107,13 @@ cookiegrab.exe 5 "C:\\path\\to\\endfield.har" --raw
 | `LTOKEN` | HoYoLAB / HoYoverse Cookie |
 | `COOKIE_TOKEN_V2` | HoYoLAB / HoYoverse Cookie |
 
-登録する Variables:
+UID / region は Cookie から自動取得します。複数アカウントなどで明示したい場合だけ Variables を登録してください。
 
 | Game | Variables |
 |---|---|
 | 原神 | `GENSHIN_UID`, `GENSHIN_REGION` |
 | 崩壊スターレイル | `HSR_UID`, `HSR_REGION` |
 | ゼンレスゾーンゼロ | `ZZZ_UID`, `ZZZ_REGION` |
-
-`Settings > Secrets and variables > Actions > Variables` に、対象ゲームの UID / region を登録してください。
 
 region の例:
 

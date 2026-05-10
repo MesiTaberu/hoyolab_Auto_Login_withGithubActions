@@ -16,6 +16,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 DEFAULT_TIMEOUT = 20
 HOYOLAB_SEARCH_URL = "https://bbs-api-os.hoyolab.com/community/search/wapi/search"
+HOYOLAB_GAME_RECORD_CARD_URL = "https://bbs-api-os.hoyolab.com/game_record/card/wapi/getGameRecordCard"
 CODE_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9]{8,20}(?![A-Za-z0-9])")
 URL_RE = re.compile(r"https?://[^\s<>\"]+")
 LABELED_CODE_RE = re.compile(
@@ -242,13 +243,61 @@ def cookie_header() -> str:
     )
 
 
+def fetch_game_roles() -> list[dict[str, Any]]:
+    ltuid = os.getenv("LTUID", "").strip()
+    if not ltuid:
+        return []
+
+    response = requests.get(
+        HOYOLAB_GAME_RECORD_CARD_URL,
+        params={"uid": ltuid},
+        headers={
+            "Cookie": cookie_header(),
+            "User-Agent": "Mozilla/5.0",
+            "x-rpc-language": "en-us",
+        },
+        timeout=DEFAULT_TIMEOUT,
+    )
+    if response.status_code >= 400:
+        print(f"HoYoLAB game role lookup failed: HTTP {response.status_code} {response.text[:160]}")
+        return []
+
+    payload = response.json()
+    if payload.get("retcode") != 0:
+        print(f"HoYoLAB game role lookup failed: retcode={payload.get('retcode')} message={payload.get('message')}")
+        return []
+
+    roles = ((payload.get("data") or {}).get("list")) or []
+    return roles if isinstance(roles, list) else []
+
+
+def resolve_uid_region(cfg: GameConfig, roles: list[dict[str, Any]]) -> tuple[str, str]:
+    uid = os.getenv(f"{cfg.env_prefix}_UID", "").strip()
+    region = os.getenv(f"{cfg.env_prefix}_REGION", "").strip()
+    if uid and region:
+        return uid, region
+
+    for role in roles:
+        if not isinstance(role, dict):
+            continue
+        if int(role.get("game_id") or 0) != cfg.hoyolab_gids:
+            continue
+        role_uid = str(role.get("game_role_id") or "").strip()
+        role_region = str(role.get("region") or "").strip()
+        if role_uid and role_region:
+            print(f"{cfg.name}: resolved UID/region from HoYoLAB game record card.")
+            return role_uid, role_region
+
+    return uid, region
+
+
 def load_profiles_from_env() -> list[RedeemProfile]:
     profiles: list[RedeemProfile] = []
+    roles = fetch_game_roles()
     for key, cfg in SUPPORTED_GAMES.items():
-        uid = os.getenv(f"{cfg.env_prefix}_UID", "").strip()
-        region = os.getenv(f"{cfg.env_prefix}_REGION", "").strip()
+        uid, region = resolve_uid_region(cfg, roles)
         if not uid or not region:
-            print(f"{cfg.name}: skipped because {cfg.env_prefix}_UID or {cfg.env_prefix}_REGION is empty.")
+            print(f"{cfg.name}: skipped because UID/region could not be resolved.")
             continue
 
         codes = fetch_codes_from_hoyolab(cfg)
