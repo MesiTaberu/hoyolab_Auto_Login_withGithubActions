@@ -94,6 +94,59 @@ cookiegrab.exe 5 "C:\\path\\to\\endfield.har" --raw
    - HoYoLAB: `retcode -5003` は「本日分取得済み」
    - Endfield: `claimed` または `already-claimed`
 
+## 交換コードの自動実行
+
+`.github/workflows/redeem-codes.yml` で、HoYoverse 系ゲームの交換コード入力も自動化できます。  
+コードは HoYoLAB 投稿検索 API から取得し、GitHub Actions 上で交換します。
+
+登録する Secrets:
+
+| Secret Name | 用途 |
+|---|---|
+| `LTUID` | HoYoLAB / HoYoverse Cookie |
+| `LTOKEN` | HoYoLAB / HoYoverse Cookie |
+| `COOKIE_TOKEN_V2` | HoYoLAB / HoYoverse Cookie |
+
+登録する Variables:
+
+| Game | Variables |
+|---|---|
+| 原神 | `GENSHIN_UID`, `GENSHIN_REGION` |
+| 崩壊スターレイル | `HSR_UID`, `HSR_REGION` |
+| ゼンレスゾーンゼロ | `ZZZ_UID`, `ZZZ_REGION` |
+
+`Settings > Secrets and variables > Actions > Variables` に、対象ゲームの UID / region を登録してください。
+
+region の例:
+
+```text
+GENSHIN_REGION=os_asia
+HSR_REGION=prod_official_asia
+ZZZ_REGION=prod_gf_jp
+```
+
+スケジュール実行は 6 時間ごとです。`workflow_dispatch` でも入力なしで手動実行できます。
+
+コード取得ロジック:
+
+- HoYoLAB 検索 API をゲーム別に新しい順で検索
+- タイトルに `code`, `redeem`, `redemption`, `コード`, `交換コード` などを含む投稿だけを候補にする
+- コード候補は投稿本文、タイトル、リンクURLの `code=` から抽出する
+- 交換APIに投げて、無効/期限切れコードは `rejected` としてログに出す
+
+必要なら Variables で検索範囲を調整できます。
+
+```text
+HOYOLAB_LOOKBACK_HOURS=168
+HOYOLAB_PAGE_SIZE=20
+REDEEM_HOYOLAB_ENABLED=true
+```
+
+注意:
+- 画像内だけに書かれたコードは読み取れません。
+- HoYoLAB 投稿の本文やタイトル表記によっては拾えないことがあります。
+- HoYoLAB の一般投稿も検索対象になるため、最終的な有効判定は交換APIの結果に依存します。
+
 ## 継続運用メモ
 
 - 定期実行が止まった場合は、まず `Actions` タブで workflow が無効化されていないか確認してください。

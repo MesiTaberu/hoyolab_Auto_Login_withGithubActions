@@ -1,0 +1,42 @@
+name: Auto Game Code Redeem
+
+on:
+  schedule:
+    - cron: '15 */6 * * *'  # 6時間ごと（UTC基準）
+  workflow_dispatch:
+
+jobs:
+  redeem:
+    runs-on: ubuntu-latest
+    env:
+      LTUID: ${{ secrets.LTUID }}
+      LTOKEN: ${{ secrets.LTOKEN }}
+      COOKIE_TOKEN_V2: ${{ secrets.COOKIE_TOKEN_V2 }}
+
+      GENSHIN_UID: ${{ vars.GENSHIN_UID }}
+      GENSHIN_REGION: ${{ vars.GENSHIN_REGION }}
+      HSR_UID: ${{ vars.HSR_UID }}
+      HSR_REGION: ${{ vars.HSR_REGION }}
+      ZZZ_UID: ${{ vars.ZZZ_UID }}
+      ZZZ_REGION: ${{ vars.ZZZ_REGION }}
+
+      REDEEM_HOYOLAB_ENABLED: ${{ vars.REDEEM_HOYOLAB_ENABLED || 'true' }}
+      HOYOLAB_LOOKBACK_HOURS: ${{ vars.HOYOLAB_LOOKBACK_HOURS || '168' }}
+      HOYOLAB_PAGE_SIZE: ${{ vars.HOYOLAB_PAGE_SIZE || '20' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirement.txt
+
+      - name: Redeem game codes
+        run: python src/redeem_codes.py
