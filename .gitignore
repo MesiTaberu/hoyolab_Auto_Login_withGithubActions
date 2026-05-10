@@ -8,6 +8,7 @@ build/
 *.spec
 .env
 *.har
+vault/
 
 # Do not commit built binaries (publish via Releases instead)
 dist/
