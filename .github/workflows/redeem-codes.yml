@@ -24,6 +24,7 @@ jobs:
       REDEEM_HOYOLAB_ENABLED: ${{ vars.REDEEM_HOYOLAB_ENABLED || 'true' }}
       HOYOLAB_LOOKBACK_HOURS: ${{ vars.HOYOLAB_LOOKBACK_HOURS || '168' }}
       HOYOLAB_PAGE_SIZE: ${{ vars.HOYOLAB_PAGE_SIZE || '20' }}
+      REDEEM_DELAY_SECONDS: ${{ vars.REDEEM_DELAY_SECONDS || '5' }}
 
     steps:
       - name: Checkout repository

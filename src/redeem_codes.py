@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -15,6 +16,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 DEFAULT_TIMEOUT = 20
+DEFAULT_REDEEM_DELAY_SECONDS = 5.0
 HOYOLAB_SEARCH_URL = "https://bbs-api-os.hoyolab.com/community/search/wapi/search"
 HOYOLAB_GAME_RECORD_CARD_URL = "https://bbs-api-os.hoyolab.com/game_record/card/wapi/getGameRecordCard"
 CODE_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9]{8,20}(?![A-Za-z0-9])")
@@ -381,7 +383,10 @@ def main() -> int:
     failed = False
     for profile in profiles:
         print(f"\n== {profile.name} code redeem ==")
-        for code in profile.codes:
+        delay_seconds = max(0.0, float(os.getenv("REDEEM_DELAY_SECONDS", str(DEFAULT_REDEEM_DELAY_SECONDS))))
+        for index, code in enumerate(profile.codes):
+            if index > 0 and delay_seconds:
+                time.sleep(delay_seconds)
             result = redeem_code(profile, code)
             status = "ok" if result["ok"] else "rejected"
             print(
