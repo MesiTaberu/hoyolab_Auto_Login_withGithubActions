@@ -2,7 +2,7 @@ name: Auto Game Code Redeem
 
 on:
   schedule:
-    - cron: '15 */6 * * *'  # 6時間ごと（UTC基準）
+    - cron: '0 16 * * *'  # 毎日01:00 JST（=16:00 UTC、ログボと同時刻）
   workflow_dispatch:
 
 jobs:

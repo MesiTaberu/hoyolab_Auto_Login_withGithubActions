@@ -124,7 +124,7 @@ HSR_REGION=prod_official_asia
 ZZZ_REGION=prod_gf_jp
 ```
 
-スケジュール実行は 6 時間ごとです。`workflow_dispatch` でも入力なしで手動実行できます。
+スケジュール実行はログボと同じ毎日 01:00 JST です。`workflow_dispatch` でも入力なしで手動実行できます。
 
 コード取得ロジック:
 
