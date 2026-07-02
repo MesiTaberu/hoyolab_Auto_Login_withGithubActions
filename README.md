@@ -13,6 +13,18 @@
 workflow 名は `Auto Hoyolab Check-in` です。  
 初回 fork 後は `Actions` タブで workflow を有効化してから使ってください。
 
+## GitHub Actions の自動無効化について
+
+GitHub Actions の scheduled workflow は、リポジトリに 60 日間アクティビティがないと自動的に無効化されることがあります。  
+無効化されそうな場合や定期実行が止まった場合は、`Actions` タブから対象 workflow を開いて有効化してください。
+
+このリポジトリで定期実行される主な workflow:
+
+| Workflow | File | 用途 |
+|---|---|---|
+| `Auto Hoyolab Check-in` | `.github/workflows/auto-checkin.yml` | HoYoLAB / Endfield のデイリーチェックイン |
+| `Auto Game Code Redeem` | `.github/workflows/redeem-codes.yml` | HoYoverse 系ゲームの交換コード自動入力 |
+
 ## セットアップ
 
 ### 1. リポジトリを fork
@@ -149,7 +161,7 @@ REDEEM_DELAY_SECONDS=5
 
 ## 継続運用メモ
 
-- 定期実行が止まった場合は、まず `Actions` タブで workflow が無効化されていないか確認してください。
+- 定期実行が止まった場合は、まず `Actions` タブで workflow が無効化されていないか確認してください。60 日以上リポジトリ更新がない場合、GitHub により scheduled workflow が自動無効化されることがあります。
 - Secret の値はログイン期限や認証更新で使えなくなることがあります。失敗が続く場合は HAR を取り直して Secret を更新してください。
 - fork 元を更新したい場合は、定期的に upstream の変更を取り込んで workflow や API 変更に追従してください。
 - 実行時刻を変えたい場合は [`.github/workflows/auto-checkin.yml`](c:/Users/hukuc/Documents/RPA_SWR/hoyolab_auto_login/hoyolab_Auto_Login_withGithubActions/.github/workflows/auto-checkin.yml) の `cron` を編集します。
